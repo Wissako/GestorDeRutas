@@ -7,30 +7,30 @@ import com.example.gestorderutas.model.Waypoint
 import kotlinx.coroutines.flow.Flow
 
 class GestorRutasRepository(private val dao: GestorRutasDao) {
-    //Rutas
 
     suspend fun insertarRuta(ruta: Ruta): Long {
-        return dao.insertarRuta(ruta) // Devuelve el ID generado
+        return dao.insertarRuta(ruta)
     }
 
     suspend fun actualizarRuta(ruta: Ruta) {
         dao.actualizarRuta(ruta)
     }
 
+    suspend fun obtenerRutaPorId(id: Long): Ruta? {
+        return dao.obtenerRutaPorId(id)
+    }
+
     fun obtenerTodasLasRutas(): Flow<List<Ruta>> {
         return dao.obtenerTodasLasRutas()
     }
 
-    // Puntos
     suspend fun guardarPuntoRuta(punto: PuntoRuta) {
-        dao.insertarPuntoRuta(punto) // [cite: 336]
+        dao.insertarPuntoRuta(punto)
     }
 
     fun obtenerPuntosDeRuta(rutaId: Long): Flow<List<PuntoRuta>> {
         return dao.obtenerPuntosDeRuta(rutaId)
     }
-
-    //WayPoints
 
     suspend fun insertarWaypoint(waypoint: Waypoint) {
         dao.insertarWaypoint(waypoint)

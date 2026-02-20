@@ -27,13 +27,9 @@ class UbicacionViewModel(
     application: Application,
     private val repository: GestorRutasRepository,
     private val fusedLocationClient: FusedLocationProviderClient
-
 ) : AndroidViewModel(application) {
 
-    // Estado para saber si estamos grabando
     var isRecording = false
-
-    // Tiempos y distancias para la UI
     private val _tiempoTranscurrido = MutableStateFlow(0L)
     val tiempoTranscurrido: StateFlow<Long> = _tiempoTranscurrido
 
@@ -43,26 +39,28 @@ class UbicacionViewModel(
     private var recordingJob: Job? = null
     private var metricasJob: Job? = null
     private var ultimoPunto: PuntoRuta? = null
+
     private val _ubicacionActual = MutableStateFlow<Ubicacion?>(null)
     val ubicacionActual: StateFlow<Ubicacion?> = _ubicacionActual
 
     private val _puntosRutaActual = MutableStateFlow<List<PuntoRuta>>(emptyList())
     val puntosRutaActual: StateFlow<List<PuntoRuta>> = _puntosRutaActual
 
-    var currentRutaId: Long? =null
+    var currentRutaId: Long? = null
     private val _waypointsActuales = MutableStateFlow<List<Waypoint>>(emptyList())
     val waypointsActuales: StateFlow<List<Waypoint>> = _waypointsActuales
 
     private val _todasLasRutas = MutableStateFlow<List<Ruta>>(emptyList())
     val todasLasRutas: StateFlow<List<Ruta>> = _todasLasRutas
+
     init {
-        //rutas de la base de datos
         viewModelScope.launch {
             repository.obtenerTodasLasRutas().collect { rutas ->
                 _todasLasRutas.value = rutas
             }
         }
     }
+
     fun iniciarGrabacionRuta(rutaId: Long) {
         if (isRecording) return
         isRecording = true
@@ -70,16 +68,16 @@ class UbicacionViewModel(
         _tiempoTranscurrido.value = 0L
         _distanciaAcumulada.value = 0.0
 
+        viewModelScope.launch {
+            repository.obtenerPuntosDeRuta(rutaId).collect { puntos ->
+                _puntosRutaActual.value = puntos
+            }
+        }
+
         metricasJob = viewModelScope.launch {
             while (isRecording) {
                 delay(1000)
                 _tiempoTranscurrido.value += 1000
-
-            }
-            viewModelScope.launch {
-                repository.obtenerPuntosDeRuta(rutaId).collect { puntos ->
-                    _puntosRutaActual.value = puntos
-                }
             }
         }
 
@@ -87,10 +85,7 @@ class UbicacionViewModel(
             while (isRecording) {
                 obtenerUbicacionActual { ubicacion ->
                     if (ubicacion != null) {
-
-                     //track en tiempo real.
                         _ubicacionActual.value = ubicacion
-
                         val nuevoPunto = PuntoRuta(
                             rutaId = rutaId,
                             lat = ubicacion.lat,
@@ -99,7 +94,6 @@ class UbicacionViewModel(
                         )
                         guardarPuntoRuta(nuevoPunto)
 
-                        // Calcular distancia acumulada usando Haversine
                         ultimoPunto?.let { anterior ->
                             val dist = calcularDistancia(anterior, nuevoPunto)
                             _distanciaAcumulada.value += dist
@@ -107,7 +101,7 @@ class UbicacionViewModel(
                         ultimoPunto = nuevoPunto
                     }
                 }
-                delay(10_000) // Espera 10 segundos
+                delay(10_000)
             }
         }
     }
@@ -159,11 +153,11 @@ class UbicacionViewModel(
         val lat2 = Math.toRadians(p2.lat)
         val deltaLat = Math.toRadians(p2.lat - p1.lat)
         val deltaLng = Math.toRadians(p2.lng - p1.lng)
-
         val a = sin(deltaLat / 2).pow(2) + cos(lat1) * cos(lat2) * sin(deltaLng / 2).pow(2)
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
         return r * c
     }
+
     fun iniciarNuevaRuta() {
         viewModelScope.launch {
             val nuevaRuta = Ruta(nombre = "Ruta ${System.currentTimeMillis()}")
@@ -171,7 +165,6 @@ class UbicacionViewModel(
             currentRutaId = id
             iniciarGrabacionRuta(id)
 
-            //waypoints de esta ruta en tiempo real
             launch {
                 repository.obtenerWaypointsDeRuta(id).collect { waypoints ->
                     _waypointsActuales.value = waypoints
@@ -179,10 +172,10 @@ class UbicacionViewModel(
             }
         }
     }
+
     fun guardarWaypoint(descripcion: String) {
         val rutaIdActual = currentRutaId ?: return
         val ubi = ubicacionActual.value ?: return
-
         viewModelScope.launch {
             val nuevoWaypoint = Waypoint(
                 rutaId = rutaIdActual,
@@ -193,20 +186,20 @@ class UbicacionViewModel(
             repository.insertarWaypoint(nuevoWaypoint)
         }
     }
+
     fun pedirUbicacionActual() {
         obtenerUbicacionActual { ubicacion ->
             _ubicacionActual.value = ubicacion
         }
     }
+
     fun finalizarRutaActual() {
         val id = currentRutaId ?: return
         detenerGrabacionRuta()
-
         viewModelScope.launch {
             val distFinal = _distanciaAcumulada.value
             val tiempoFinal = _tiempoTranscurrido.value
             val velMedia = if (tiempoFinal > 0) (distFinal / 1000.0) / (tiempoFinal / 3600000.0) else 0.0
-
             val rutaFinalizada = Ruta(
                 id = id,
                 nombre = "Ruta ${System.currentTimeMillis()}",
@@ -218,19 +211,24 @@ class UbicacionViewModel(
             currentRutaId = null
         }
     }
-    fun cargarRutaHistorica(rutaId: Long) {
 
-        //Detenemos cualquier grabación si estuviera activa
+    fun cargarRutaHistorica(rutaId: Long) {
         detenerGrabacionRuta()
 
-        //Cargamos los puntos de esa ruta específica ordenados por tiempo
+        viewModelScope.launch {
+            val ruta = repository.obtenerRutaPorId(rutaId)
+            ruta?.let {
+                _distanciaAcumulada.value = it.distancia
+                _tiempoTranscurrido.value = it.duracion
+            }
+        }
+
         viewModelScope.launch {
             repository.obtenerPuntosDeRuta(rutaId).collect { puntos ->
                 _puntosRutaActual.value = puntos
             }
         }
 
-        // 3. Cargamos los waypoints de esa ruta
         viewModelScope.launch {
             repository.obtenerWaypointsDeRuta(rutaId).collect { waypoints ->
                 _waypointsActuales.value = waypoints
@@ -238,7 +236,6 @@ class UbicacionViewModel(
         }
     }
 
-    //Función para limpiar el mapa y empezar de cero
     fun limpiarMapa() {
         _puntosRutaActual.value = emptyList()
         _waypointsActuales.value = emptyList()

@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("kotlin-kapt")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -14,7 +15,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -76,4 +77,6 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     //navegacion
     implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation(platform("com.google.firebase:firebase-bom:34.9.0"))
+
 }

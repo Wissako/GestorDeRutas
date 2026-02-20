@@ -10,25 +10,25 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface GestorRutasDao {
 
-    //Métodos para Ruta
-    @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarRuta(ruta: Ruta): Long
 
     @Update
     suspend fun actualizarRuta(ruta: Ruta)
 
+    @Query("SELECT * FROM ruta WHERE id = :id")
+    suspend fun obtenerRutaPorId(id: Long): Ruta?
+
     @Query("SELECT * FROM ruta ORDER BY id DESC")
     fun obtenerTodasLasRutas(): Flow<List<Ruta>>
 
-    //Métodos para Punto De Ruta
-    @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarPuntoRuta(punto: PuntoRuta)
 
     @Query("SELECT * FROM punto_ruta WHERE rutaId = :rutaId ORDER BY timestamp ASC")
     fun obtenerPuntosDeRuta(rutaId: Long): Flow<List<PuntoRuta>>
 
-    //Métodos para Waypoint
-    @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarWaypoint(waypoint: Waypoint)
 
     @Query("SELECT * FROM waypoint WHERE rutaId = :rutaId")
